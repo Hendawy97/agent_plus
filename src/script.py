@@ -2,247 +2,17 @@ import Autodesk
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI import *
 from pyrevit.forms import WPFWindow
-
-import requests
-import json
-import clr
-clr.AddReference("System.Drawing")
-from System.Drawing import Bitmap, Image
-
-from System.Windows.Media.Imaging import BitmapImage
-from System import Uri
-from System.IO import Path, FileNotFoundException
-from System.Windows.Forms import DialogResult
-from Microsoft.Win32 import OpenFileDialog
-
-
-from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory, ElementCategoryFilter, FamilySymbol
-from Autodesk.Revit.DB import Element
-
-doc = __revit__.ActiveUIDocument.Document
-uidoc = __revit__.ActiveUIDocument
-
-#region
-
-# class ModalForm(WPFWindow):
-#     def __init__(self, xaml_file_name):
-#         WPFWindow.__init__(self, xaml_file_name)
-#         self.prompt = None
-#         self.ShowDialog()
-
-#     def process_input(self, sender, e):
-#         # Get the text input from the TextBox
-#         self.prompt = self.textBox.Text
-#         print(self.prompt)
-
-#     def addTextBtn_Click(self, sender, e):
-#         # Process the input from the TextBox
-#         self.process_input(sender, e)
-#         all_window = get_all_windows(doc)
-#         all_door = get_all_doors(doc)
-#         # all_room = get_all_rooms(doc)
-#         print(all_window)
-#         print(all_door)
-
-
-# # Function for server request (if needed for future use)
-# # def trigger_input_processing(prompt):
-# #     endpoint = "http://localhost:5000/process_input"
-# #     data = {'prompt': prompt}
-# #     print(data)
-
-# #     try:
-# #         response = requests.post(endpoint, json=data)
-# #         print(response)
-
-# #         if response.status_code == 200:
-# #             print("Server processed the input successfully.")
-# #         elif response.status_code == 500:
-# #             print("Server error:", response.text)
-# #         else:
-# #             print("Unexpected status code:", response.status_code)
-# #     except requests.exceptions.RequestException as e:
-# #         print("Error:", e)
-
-
-
-# def get_all_windows(doc):
-#     # Get all windows in the Revit project
-#     windows = FilteredElementCollector(doc) \
-#         .OfCategory(BuiltInCategory.OST_Windows) \
-#         .WhereElementIsNotElementType() \
-#         .ToElements()
-
-#     window_list = []
-#     for window in windows:
-#         window_list.append(window.Name)
-    
-#     return window_list
-
-# def get_all_doors(doc):
-#     # Get all doors in the Revit project
-#     doors = FilteredElementCollector(doc) \
-#         .OfCategory(BuiltInCategory.OST_Doors) \
-#         .WhereElementIsNotElementType() \
-#         .ToElements()
-
-#     door_list = []
-#     for door in doors:
-#         door_list.append(door.Name)
-    
-#     return door_list
-
-# def get_all_rooms(doc):
-#     # Get all rooms in the Revit project
-#     rooms = FilteredElementCollector(doc) \
-#         .OfCategory(BuiltInCategory.OST_Rooms) \
-#         .WhereElementIsNotElementType() \
-#         .ToElements()
-
-#     room_list = []
-#     for room in rooms:
-#         room_list.append(room.Name)
-    
-#     return room_list
-
-
-# # Instantiate the modal form with the XAML file
-# form = ModalForm('TextBox.xaml')
-
-#endregion
-
-#region 
-
-# import clr
-# from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory
-# from pyrevit.forms import WPFWindow
-# import sys
-# import requests
-
-# # Document object from the Revit environment
-# doc = __revit__.ActiveUIDocument.Document
-# uidoc = __revit__.ActiveUIDocument
-
-
-# # ModalForm class for WPF interaction
-# class ModalForm(WPFWindow):
-#     def __init__(self, xaml_file_name):
-#         WPFWindow.__init__(self, xaml_file_name)
-#         self.prompt = None
-#         self.ShowDialog()
-
-#     def process_input(self, sender, e):
-#         # Get the text input from the TextBox
-#         self.prompt = self.textBox.Text
-#         print(self.prompt)
-#         # Call the server API with the prompt
-#         call_server_api(self.prompt)
-
-#     def addTextBtn_Click(self, sender, e):
-#         # Process the input from the TextBox
-#         self.process_input(sender, e)
-#         # all_windows = get_all_windows(doc)
-#         # all_doors = get_all_doors(doc)
-#         # print("Windows:", all_windows)
-#         # print("Doors:", all_doors)
-
-
-# # Function to call the server with the prompt
-# def call_server_api(prompt):
-#     endpoint = "http://localhost:5000/revit/"  # Assuming your server is running at this URL
-#     data = {'prompt': prompt}
-    
-#     try:
-#         response = requests.post(endpoint, json=data)
-#         if response.status_code == 200:
-#             print("Server processed the input successfully.")
-#             print(response.json())  # Assuming server returns a JSON response
-#         else:
-#             print("Error from server: {0} - {1}".format(response.status_code, response.text))
-#     except requests.exceptions.RequestException as e:
-#         print("Error connecting to server: {0}".format(e))
-
-# # Functions to retrieve Revit elements
-# def get_all_windows(doc):
-#     """Get all windows in the Revit project."""
-#     windows = FilteredElementCollector(doc) \
-#         .OfCategory(BuiltInCategory.OST_Windows) \
-#         .WhereElementIsNotElementType() \
-#         .ToElements()
-
-#     window_list = [window.Name for window in windows]
-#     return window_list
-
-
-# def get_all_doors(doc):
-#     """Get all doors in the Revit project."""
-#     doors = FilteredElementCollector(doc) \
-#         .OfCategory(BuiltInCategory.OST_Doors) \
-#         .WhereElementIsNotElementType() \
-#         .ToElements()
-
-#     door_list = [door.Name for door in doors]
-#     return door_list
-
-
-# def get_all_rooms(doc):
-#     """Get all rooms in the Revit project."""
-#     rooms = FilteredElementCollector(doc) \
-#         .OfCategory(BuiltInCategory.OST_Rooms) \
-#         .WhereElementIsNotElementType() \
-#         .ToElements()
-
-#     room_list = [room.Name for room in rooms]
-#     return room_list
-
-
-# # Logic to execute based on the context
-# args = getattr(sys, "argv", [])
-# if len(args) < 2:
-#     # Launch WPF ModalForm if no command-line arguments are provided
-#     print("Launching WPF ModalForm...")
-#     form = ModalForm('TextBox.xaml')
-# # else:
-#     # Handle server-based function calls
-#     function_name = args[1]
-
-#     # Map function names to actual functions
-#     function_mapping = {
-#         "get_all_windows": get_all_windows,
-#         "get_all_doors": get_all_doors,
-#         "get_all_rooms": get_all_rooms,
-#     }
-
-#     # Call the specified function
-#     if function_name in function_mapping:
-#         try:
-#             result = function_mapping[function_name](doc)
-#             print(result)
-#         except Exception as e:
-#             print("Error executing {0}: {1}".format(function_name,e))
-#     else:
-#         print("Invalid function name: {0}").format(function_name)
-
-
-#endregion
-
-#region
-
-import clr
-from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory
-from pyrevit.forms import WPFWindow
-import sys
-import requests
-import json
-from Autodesk.Revit.UI.Selection import ObjectType
 from System.Collections.Generic import List
-from Autodesk.Revit.DB import ElementId, FilteredElementCollector, BuiltInCategory
-from Autodesk.Revit.DB import Transaction
+import requests
+import json
+import clr
+import sys
+clr.AddReference("System.Drawing")
+import inspect
 
-# Document object from the Revit environment
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
-
+# from langchain_core.tools import tool
 
 # ModalForm class for WPF interaction
 class ModalForm(WPFWindow):
@@ -261,7 +31,7 @@ class ModalForm(WPFWindow):
         # override_window_graphics(doc)
         # toggle_category_visibility(doc, uidoc, "walls")
         # select_elements_by_category(doc, uidoc, "walls")
-
+        # get_elements_by_category(doc,  "walls")
 
 
         # Call the server API with the prompt
@@ -270,30 +40,6 @@ class ModalForm(WPFWindow):
     def addTextBtn_Click(self, sender, e):
         # Process the input from the TextBox
         self.process_input(sender, e)
-
-
-# Function to call the server with the prompt
-def call_server_api_(prompt):
-    endpoint = "http://localhost:5000/revit/"  # Assuming your server is running at this URL
-    data = {'prompt': prompt}
-    
-    try:
-        response = requests.post(endpoint, json=data)
-        if response.status_code == 200:
-            print("Server processed the input successfully.")
-            # Parse the JSON response to get the function name
-            response_json = response.json()
-            print(response_json)
-            function_name = extract_function_name(response_json)
-            print(function_name)
-            execute_function(function_name)
-        else:
-            print("Error from server: {0} - {1}".format(response.status_code, response.text))
-    except requests.exceptions.RequestException as e:
-        print("Error connecting to server: {0}".format(e))
-
-
-#region 
 
 def call_server_api(prompt):
     """
@@ -328,7 +74,8 @@ def call_server_api(prompt):
                     
                     # Pass extracted arguments dynamically
                     # execute_function(function_name, *arguments.values())
-                    execute_function(function_name, doc, uidoc, **arguments)
+                    # execute_function(function_name, doc, uidoc, **arguments)
+                    execute_function(function_name, **arguments)
                 else:
                     print("No function name found in the server response.")
             else:
@@ -339,11 +86,6 @@ def call_server_api(prompt):
     except requests.exceptions.RequestException as e:
         # Handle connection errors
         print("Error connecting to server: {0}".format(e))
-
-
-#endregion
-
-
 
 # Function to extract the function name from the server response
 def extract_function_name(response_json):
@@ -364,7 +106,7 @@ def extract_function_name(response_json):
         print("Error extracting function name: {0}".format(e))
         return None
 
-
+#region 
 # Functions to retrieve Revit elements
 def get_all_windows(doc):
     """Get all windows in the Revit project."""
@@ -376,7 +118,6 @@ def get_all_windows(doc):
     window_list = [window.Name for window in windows]
     return window_list
 
-
 def get_all_doors(doc):
     """Get all doors in the Revit project."""
     doors = FilteredElementCollector(doc) \
@@ -387,7 +128,6 @@ def get_all_doors(doc):
     door_list = [door.Name for door in doors]
     return door_list
 
-
 def get_all_rooms(doc):
     """Get all rooms in the Revit project."""
     rooms = FilteredElementCollector(doc) \
@@ -397,7 +137,6 @@ def get_all_rooms(doc):
 
     room_list = [room.Name for room in rooms]
     return room_list
-
 
 def select_all_windows(doc, uidoc):
     """Select all windows in the Revit project."""
@@ -418,77 +157,6 @@ def select_all_windows(doc, uidoc):
         print("Successfully selected {len(window_ids)} windows.")
     except Exception as e:
         print("Error selecting windows: {0}".format(e))
-
-# Logic to execute based on the context
-def execute_function_(function_name):
-    # Map function names to actual functions
-    function_mapping = {
-        "get_all_windows": (get_all_windows, 1),
-        "get_all_doors": (get_all_doors, 1),
-        "get_all_rooms": (get_all_rooms, 1),
-        "select_all_windows": (select_all_windows, 2),
-        # "toggle_wall_visibility": (toggle_wall_visibility, 2),
-        "toggle_category_visibility": (toggle_category_visibility, 3),
-    }
-
-    # Check if the function exists in the mapping
-    if function_name in function_mapping:
-        try:
-            func, param_count = function_mapping[function_name]
-            
-            # Call with appropriate parameters
-            if param_count == 1:
-                result = func(doc)
-            elif param_count == 2:
-                result = func(doc, uidoc)
-            else:
-                raise ValueError("Unsupported parameter count for function.")
-            
-            print(result)
-        except Exception as e:
-            print("Error executing {0}: {1}".format(function_name, e))
-    else:
-        print("Invalid function name: {0}".format(function_name))
-
-#region 
-
-def execute_function(function_name, *args, **kwargs):
-    """
-    Executes the specified function with dynamic arguments.
-
-    Args:
-        function_name (str): The name of the function to execute.
-        *args: Positional arguments for the function.
-        **kwargs: Keyword arguments for the function.
-    """
-    function_mapping = {
-        "get_all_windows": (get_all_windows, 1),
-        "get_all_doors": (get_all_doors, 1),
-        "get_all_rooms": (get_all_rooms, 1),
-        "toggle_category_visibility": (toggle_category_visibility, 3),
-        "select_elements_by_category": (select_elements_by_category, 3),
-        "select_all_windows": (select_all_windows, 2),
-    }
-
-    if function_name in function_mapping:
-        try:
-            func, param_count = function_mapping[function_name]
-            
-            # Check for the number of expected arguments
-            if len(args) + len(kwargs) == param_count:
-                result = func(*args, **kwargs)
-                print(result)
-            else:
-                 raise ValueError(
-                    "{0} expects {1} arguments, but {2} were given.".format(
-                        function_name, param_count, len(args) + len(kwargs)
-                    ))
-        except Exception as e:
-            print("Error executing {0}: {1}".format(function_name, e))
-    else:
-        print("Invalid function name: {0}".format(function_name))
-
-#endregion
 
 def toggle_wall_visibility(doc, uidoc):
     """Toggle visibility of walls in the active view."""
@@ -522,6 +190,89 @@ def toggle_wall_visibility(doc, uidoc):
         print("Wall visibility toggled. Walls are now {0}.".format("hidden" if new_visibility else "visible"))
     except Exception as e:
         print("Error toggling wall visibility: {0}".format(e))
+# Logic to execute based on the context
+
+def execute_function_(function_name, *args, **kwargs):
+    """
+    Executes the specified function with dynamic arguments.
+
+    Args:
+        function_name (str): The name of the function to execute.
+        *args: Positional arguments for the function.
+        **kwargs: Keyword arguments for the function.
+    """
+    function_mapping = {
+        # "get_all_windows": (get_all_windows, 1),
+        # "get_all_doors": (get_all_doors, 1),
+        # "get_all_rooms": (get_all_rooms, 1),
+        "toggle_category_visibility": (toggle_category_visibility, 3),
+        "select_elements_by_category": (select_elements_by_category, 3),
+        "get_elements_by_category": (get_elements_by_category, 2),
+        # "select_all_windows": (select_all_windows, 2),
+    }
+
+    if function_name in function_mapping:
+        try:
+            func, param_count = function_mapping[function_name]
+            
+            # Check for the number of expected arguments
+            if len(args) + len(kwargs) == param_count:
+                result = func(*args, **kwargs)
+                print(result)
+            else:
+                 raise ValueError(
+                    "{0} expects {1} arguments, but {2} were given.".format(
+                        function_name, param_count, len(args) + len(kwargs)
+                    ))
+        except Exception as e:
+            print("Error executing {0}: {1}".format(function_name, e))
+    else:
+        print("Invalid function name: {0}".format(function_name))
+
+def execute_function(function_name, *args, **kwargs):
+    """
+    Executes the specified function with dynamic arguments.
+
+    Args:
+        function_name (str): The name of the function to execute.
+        *args: Positional arguments for the function.
+        **kwargs: Keyword arguments for the function.
+    """
+    function_mapping = {
+        # "get_all_windows": (get_all_windows, 1),
+        # "get_all_doors": (get_all_doors, 1),
+        # "get_all_rooms": (get_all_rooms, 1),
+        "toggle_category_visibility": (toggle_category_visibility, 3),
+        "select_elements_by_category": (select_elements_by_category, 3),
+        "get_elements_by_category": (get_elements_by_category, 2),
+        # "select_all_windows": (select_all_windows, 2),
+    }
+
+    if function_name in function_mapping:
+        try:
+            func, param_count = function_mapping[function_name]
+            
+            # Dynamically prepare arguments based on the expected count
+            provided_args = [doc, uidoc]  # Base arguments
+            if param_count <= len(provided_args):
+                provided_args = provided_args[:param_count]  # Trim if fewer args are needed
+            
+            # Include kwargs if necessary
+            total_args = len(provided_args) + len(kwargs)
+            if total_args == param_count:
+                result = func(*provided_args, **kwargs)
+                print("Result from {0}: {1}".format(function_name, result))
+            else:
+                raise ValueError(
+                    "{0} expects {1} arguments, but {2} were given.".format(function_name, param_count, total_args)
+                )
+        except Exception as e:
+            print("Error executing {0}: {1}".format(function_name, e))
+    else:
+        print("Invalid function name: {0}".format(function_name))
+
+#endregion
+
 
 #make hide more generic dependig on the user inputs 
 def toggle_category_visibility(doc, uidoc, category_name):
@@ -563,17 +314,6 @@ def toggle_category_visibility(doc, uidoc, category_name):
         print("Error toggling category visibility: {0}".format(e))
         return "Error: {0}".format(e)
 
-def map_user_input_to_category(user_input):
-    """Map user input to a BuiltInCategory."""
-    CATEGORY_MAPPING = {
-        "walls": BuiltInCategory.OST_Walls,
-        "doors": BuiltInCategory.OST_Doors,
-        "windows": BuiltInCategory.OST_Windows,
-        "rooms": BuiltInCategory.OST_Rooms,
-        "floors": BuiltInCategory.OST_Floors,
-    }
-    return CATEGORY_MAPPING.get(user_input.lower())
-
 #make the selection more generic 
 def select_elements_by_category(doc, uidoc, category_name):
     """
@@ -612,6 +352,58 @@ def select_elements_by_category(doc, uidoc, category_name):
     except Exception as e:
         print("Error selecting elements from category '{0}': {1}".format(category_name, e))
 
+def get_elements_by_category(doc,  category_name):
+    """
+    Retrieve all elements of a specified category.
+
+    Parameters:
+        doc: The Revit document.
+        category_name: The name of the category (e.g., 'windows', 'doors').
+    
+    Returns:
+        List of element names in the specified category.
+    """
+    try:
+        # Use the mapping function to get the BuiltInCategory
+        category = map_user_input_to_category(category_name)
+
+        if not category:
+            raise ValueError(
+                "Invalid category name: '{0}'. Supported categories are: {1}".format(
+                    category_name, ", ".join(map_user_input_to_category("").keys())
+                )
+            )
+        
+        # Collect elements of the specified category
+        elements = FilteredElementCollector(doc) \
+            .OfCategory(category) \
+            .WhereElementIsNotElementType() \
+            .ToElements()
+        
+        # Print the IDs of the elements
+        element_ids = [element.Id.IntegerValue for element in elements]
+        print("Element IDs in category '{}':".format(category_name))
+        for element_id in element_ids:
+            print(element_id)
+        
+        # Extract and return element names
+        element_list = [element.Name for element in elements]
+        print(element_list)
+        return element_list
+    except Exception as e:
+        print("Error retrieving elements for category '{0}': {1}".format(category_name, e))
+        return []
+
+def map_user_input_to_category(user_input):
+    """Map user input to a BuiltInCategory."""
+    CATEGORY_MAPPING = {
+        "walls": BuiltInCategory.OST_Walls,
+        "doors": BuiltInCategory.OST_Doors,
+        "windows": BuiltInCategory.OST_Windows,
+        "rooms": BuiltInCategory.OST_Rooms,
+        "floors": BuiltInCategory.OST_Floors,
+    }
+    return CATEGORY_MAPPING.get(user_input.lower())
 
 
 
@@ -622,7 +414,3 @@ if len(args) < 2:
     print("Launching WPF ModalForm...")
     form = ModalForm('TextBox.xaml')
 
-
-
-
-#endregion
