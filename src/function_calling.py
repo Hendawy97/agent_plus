@@ -7,6 +7,14 @@ import subprocess
 import uvicorn
 import os
 from langchain import hub
+from langchain_openai import ChatOpenAI
+
+from langgraph.graph import MessagesState
+from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.graph import START, StateGraph
+from langgraph.prebuilt import tools_condition
+from langgraph.prebuilt import ToolNode
+from IPython.display import Image, display
 
 
 # Initialize FastAPI app
@@ -29,6 +37,34 @@ def call_openai(prompt, function_definitions):
             messages=[
                 {"role": "system", "content": "You are a Revit assistant."},
                 {"role": "user", "content": prompt},
+                
+                # {f"""role": "system", "content": "Answer the following questions as best you can. You have access to the following tools:in the {function_definitions}
+                #  Use the following format:
+
+                #     Question: the input question you must answer
+
+                #     Thought: you should always think about what to do
+
+                #     Action: the action to take, should be one of {function_definitions}
+
+                #     Action Input: the input to the action
+
+                #     Observation: the result of the action
+
+                #     ... (this Thought/Action/Action Input/Observation can repeat N times)
+
+                #     Thought: I now know the final answer
+
+                #     Final Answer: the final answer to the original input question
+
+                #     Begin!
+
+                #     Question: {prompt}
+
+                 
+                #  """
+                #  }
+                
             ],
             functions=function_definitions,
             function_call="auto",
@@ -57,26 +93,7 @@ async def interact_with_revit(request: RevitRequest):
 
     # Define Revit function definitions for OpenAI
     function_definitions = [
-        # {
-        #     "name": "get_all_windows",
-        #     "description": "Retrieve all windows from the Revit model.",
-        #     "parameters": {"type": "object", "properties": {}, "required": []},
-        # },
-        # {
-        #     "name": "get_all_doors",
-        #     "description": "Retrieve all doors from the Revit model.",
-        #     "parameters": {"type": "object", "properties": {}, "required": []},
-        # },
-        # {
-        #     "name": "get_all_walls",
-        #     "description": "Retrieve all walls from the Revit model.",
-        #     "parameters": {"type": "object", "properties": {}, "required": []},
-        # },
-        # {
-        #     "name": "select_all_windows",
-        #     "description": "make a selection to all windows from the Revit model.",
-        #     "parameters": {"type": "object", "properties": {}, "required": []},
-        # },
+        
         {
         "name": "toggle_category_visibility",
         "description": "Toggle visibility for a specific category in the active view.",
@@ -115,7 +132,22 @@ async def interact_with_revit(request: RevitRequest):
                 },
                 "required": ["category_name"]
             }
+        },
+            {
+        "name": "select_small_rooms",
+        "description": "Select rooms with an area below a specified threshold.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "area_threshold": {
+                    "type": "number",
+                    "description": "The maximum room area (in square meters) to qualify for selection.",
+                    "default": 10
+                },
+            },
+            "required": ["area_threshold"]
         }
+    }
     ]
 
     # Call OpenAI API
@@ -133,6 +165,7 @@ async def interact_with_revit(request: RevitRequest):
         result = f"No function selected. AI response: {ai_response}"
 
     return {"ai_response": ai_response, "revit_result": result}
+
 
 
 if __name__ == "__main__":
