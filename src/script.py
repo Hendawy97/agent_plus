@@ -3,12 +3,16 @@ from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI import *
 from pyrevit.forms import WPFWindow
 from System.Collections.Generic import List
+from System.Collections.Generic import List
+from Autodesk.Revit.DB import ElementId, BuiltInCategory, FilteredElementCollector, XYZ
 import requests
 import json
 import clr
 import sys
 clr.AddReference("System.Drawing")
 import inspect
+import csv
+import os
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -34,11 +38,16 @@ class ModalForm(WPFWindow):
         # get_elements_by_category(doc,  "walls")
         # select_small_rooms(doc, uidoc, area_threshold=10)
         # create_room_schedule(doc, schedule_name="Room Schedule__")
-        highlight_rooms_without_doors(doc, uidoc)
+        # highlight_rooms_without_doors(doc, uidoc)
+        # check_and_create_csv("D:\Revit_and\test_room_content")
+        # export_elements_inside_rooms_to_csv(doc, "D:\\Revit_and\\test_room_content\\test_room_content.csv")
+
+        # export_elements_inside_rooms(doc)
+
 
 
         # Call the server API with the prompt
-        # call_server_api(self.prompt)
+        call_server_api(self.prompt)
 
     def addTextBtn_Click(self, sender, e):
         # Process the input from the TextBox
@@ -90,6 +99,91 @@ def call_server_api(prompt):
         # Handle connection errors
         print("Error connecting to server: {0}".format(e))
 
+
+def call_server_api_(prompt):
+    """
+    Sends a prompt to the server API, parses the response, and executes the corresponding function(s).
+
+    Args:
+        prompt (str): The user input to be sent to the server.
+    """
+    endpoint = "http://localhost:5000/revit/"  # Update with the actual server URL if different
+    data = {'prompt': prompt}
+    
+    try:
+        # Send POST request to the server
+        response = requests.post(endpoint, json=data)
+        
+        if response.status_code == 200:
+            print("Server processed the input successfully.")
+            
+            # Parse the JSON response
+            response_json = response.json()
+            print("Server Response: ", response_json)
+            
+            # Extract the 'choices' from the response and look for 'function_call' or other relevant actions
+            choices = response_json.get('ai_response', {}).get('choices', [])
+            
+            if choices:
+                # Parse the response content to extract action and input
+                message_content = choices[0].get('message', {}).get('content', "")
+                print("Message Content: ", message_content)
+                
+                # Extract actions from the message content
+                actions = extract_actions_from_message(message_content)
+                
+                if actions:
+                    # Execute all actions sequentially
+                    for action in actions:
+                        function_name = action.get("function_name")
+                        arguments = action.get("arguments", {})
+                        
+                        if function_name:
+                            print("Executing function: {0} with arguments: {1}".format(function_name, arguments))
+                            try:
+                                execute_function(function_name, **arguments)
+                            except Exception as e:
+                                print("Error executing function {0}: {1}".format(function_name, e))
+                        else:
+                            print("No function name found in the action.")
+                else:
+                    print("No actions found in the message content.")
+            else:
+                print("No 'choices' detected in AI response.")
+        else:
+            # Handle HTTP error responses
+            print("Error from server: {0} - {1}".format(response.status_code, response.text))
+    except requests.exceptions.RequestException as e:
+        # Handle connection errors
+        print("Error connecting to server: {0}".format(e))
+
+
+def extract_actions_from_message(content):
+    """
+    Extracts actions from the AI response content based on specific patterns or structure.
+    
+    Args:
+        content (str): The content of the AI response message.
+        
+    Returns:
+        list: A list of actions (each represented as a dictionary).
+    """
+    actions = []
+    
+    # Check for action keywords and extract data
+    if "Action" in content:
+        # Example pattern to extract actions (this needs to be adjusted based on exact response format)
+        action_lines = content.split('\n')
+        for line in action_lines:
+            if "Action:" in line:
+                action_name = line.split(":")[1].strip()
+                action_input = next((l for l in action_lines if "Action Input:" in l), "").split(":")[1].strip()
+                actions.append({"function_name": action_name, "arguments": json.loads(action_input)})
+    
+    return actions
+
+
+
 def execute_function(function_name, *args, **kwargs):
     """
     Executes the specified function with dynamic arguments.
@@ -107,7 +201,9 @@ def execute_function(function_name, *args, **kwargs):
         "select_elements_by_category": (select_elements_by_category, 3),
         "get_elements_by_category": (get_elements_by_category, 2),
         "select_small_rooms": (select_small_rooms, 3),
-        # "select_all_windows": (select_all_windows, 2),
+        "create_room_schedule": (create_room_schedule, 2),
+        "highlight_rooms_without_doors": (highlight_rooms_without_doors, 2),
+        
     }
 
     if function_name in function_mapping:
@@ -121,6 +217,7 @@ def execute_function(function_name, *args, **kwargs):
             
             # Include kwargs if necessary
             total_args = len(provided_args) + len(kwargs)
+            # print(*args, **kwargs)
             if total_args == param_count:
                 result = func(*provided_args, **kwargs)
                 print("Result from {0}: {1}".format(function_name, result))
@@ -132,6 +229,47 @@ def execute_function(function_name, *args, **kwargs):
             print("Error executing {0}: {1}".format(function_name, e))
     else:
         print("Invalid function name: {0}".format(function_name))
+
+def execute_function_(function_name, *args, **kwargs):
+    """
+    Executes the specified function with dynamic arguments.
+
+    Args:
+        function_name (str): The name of the function to execute.
+        *args: Positional arguments for the function.
+        **kwargs: Keyword arguments for the function.
+    """
+    # Define a mapping of function names to their required arguments
+    function_mapping = {
+        "toggle_category_visibility": (toggle_category_visibility, True),  # Needs doc, uidoc
+        "select_elements_by_category": (select_elements_by_category, True),  # Needs doc, uidoc
+        "get_elements_by_category": (get_elements_by_category, False),  # Needs only doc
+        "create_room_schedule": (create_room_schedule, False),  # Needs only doc
+        "highlight_rooms_without_doors": (highlight_rooms_without_doors, True),  # Needs doc, uidoc
+        "export_elements_inside_rooms": (export_elements_inside_rooms, False)
+    }
+
+    if function_name in function_mapping:
+        try:
+            func, needs_uidoc = function_mapping[function_name]
+
+            # Base arguments
+            base_args = [doc]
+            if needs_uidoc:
+                base_args.append(uidoc)
+
+            # Add additional arguments
+            all_args = base_args + list(args)
+
+            # Execute the function
+            result = func(*all_args, **kwargs)
+            print("Result from {0}: {1}".format(function_name, result))
+
+        except Exception as e:
+            print("Error executing {0}: {1}".format(function_name, e))
+    else:
+        print("Invalid function name: {0}".format(function_name))
+
 
 # Function to extract the function name from the server response
 def extract_function_name(response_json):
@@ -151,6 +289,60 @@ def extract_function_name(response_json):
     except Exception as e:
         print("Error extracting function name: {0}".format(e))
         return None
+
+
+#region
+
+# def execute_function_sequence(function_sequence):
+#     """
+#     Executes a sequence of functions in order.
+
+#     Args:
+#         function_sequence (list): A list of function dictionaries with 'name' and 'args'.
+#     """
+#     for function_data in function_sequence:
+#         function_name = function_data.get('name')
+#         arguments = function_data.get('args', {})
+#         if function_name:
+#             print("Executing {0} with arguments: {1}".format(function_name, arguments))
+#             execute_function(function_name, **arguments)
+#         else:
+#             print("Invalid function data:", function_data)
+
+# def call_server_api(prompt):
+#     """
+#     Sends a prompt to the server API, parses the response, and executes functions in sequence.
+
+#     Args:
+#         prompt (str): The user input to be sent to the server.
+#     """
+#     endpoint = "http://localhost:5000/revit/"  # Update with the actual server URL
+#     data = {'prompt': prompt}
+
+#     try:
+#         response = requests.post(endpoint, json=data)
+
+#         if response.status_code == 200:
+#             print("Server processed the input successfully.")
+#             response_json = response.json()
+
+#             # Parse the function sequence
+#             function_sequence = response_json.get('function_sequence', [])
+#             if function_sequence:
+#                 execute_function_sequence(function_sequence)
+#             else:
+#                 print("No valid function sequence found in the server response.")
+#         else:
+#             print("Server error {0}: {1}".format(response.status_code, response.text))
+#     except requests.exceptions.RequestException as e:
+#         print("Error connecting to server: {0}".format(e))
+
+
+
+#endregion
+
+
+#region tools
 
 #make hide more generic dependig on the user inputs 
 def toggle_category_visibility(doc, uidoc, category_name):
@@ -388,7 +580,7 @@ def select_small_rooms(doc, uidoc, area_threshold=10):
         print("Error in selecting small rooms: {0}".format(e))
 
 #### create room schedule
-def create_room_schedule(doc, schedule_name="Room Schedule"):
+def create_room_schedule(doc, schedule_name="Room Schedule_,"):
     """
     Create a new room schedule in the Revit project.
 
@@ -451,30 +643,237 @@ def add_schedule_field(schedule, built_in_param):
         print("Error adding field with parameter '{0}': {1}".format(built_in_param,e))
         return None
 
-
 #### 
 def highlight_rooms_without_doors(doc, uidoc):
-    """Highlight all rooms that do not contain any doors."""
+    """
+    Highlight rooms in the model that do not have any doors.
+
+    Args:
+        doc: The Revit document.
+        uidoc: The Revit UI document.
+    """
     try:
+        # Step 1: Retrieve all rooms
         rooms = get_all_rooms(doc)
-        rooms_without_doors = List[ElementId]()
-        for room in rooms:
-            boundaries = room.GetBoundarySegments(SpatialElementBoundaryOptions())
-            contains_door = False
-            for boundary in boundaries:
-                for segment in boundary:
-                    element = doc.GetElement(segment.ElementId)
-                    if element and element.Category and element.Category.Id.IntegerValue == BuiltInCategory.OST_Doors:
-                        contains_door = True
-                        break
-            if not contains_door:
-                rooms_without_doors.Add(room.Id)
-        uidoc.Selection.SetElementIds(rooms_without_doors)
-        # select_rooms(uidoc, rooms_without_doors)
+
+        # Step 2: Identify rooms without doors
+        room_ids_without_doors = find_rooms_without_doors(doc, rooms)
+
+        # Step 3: Convert to ICollection[ElementId]
+        ids_to_highlight = List[ElementId]()
+        for room_id in room_ids_without_doors:
+            ids_to_highlight.Add(room_id)
+
+        # Step 4: Highlight rooms in the UI
+        uidoc.Selection.SetElementIds(ids_to_highlight)
+        print("Highlighted {} rooms without doors.".format(len(room_ids_without_doors)))
+
     except Exception as e:
-        print("Error highlighting rooms without doors: {0}".format(e))
+        print("Error highlighting rooms without doors: {}".format(e))
+
+def find_rooms_without_doors(doc, rooms):
+    """
+    Identify rooms without doors.
+
+    Args:
+        doc: The Revit document.
+        rooms: List of room elements.
+
+    Returns:
+        List of ElementIds for rooms without doors.
+    """
+    rooms_without_doors = []
+    for room in rooms:
+        try:
+            # Get the room's bounding box
+            room_bbox = room.get_BoundingBox(None)
+            if not room_bbox:
+                continue
+
+            # Collect doors in the bounding box
+            doors_in_room = []
+            door_collector = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Doors).WhereElementIsNotElementType()
+            for door in door_collector:
+                if door.Location and door.Location.Point:
+                    door_point = door.Location.Point
+                    if is_point_in_bbox(door_point, room_bbox):
+                        doors_in_room.append(door)
+
+            # Check if no doors exist in the room
+            if not doors_in_room:
+                rooms_without_doors.append(room.Id)
+        except Exception as e:
+            print("Error processing room with ID {}: {}".format(room.Id.IntegerValue, e))
+
+    return rooms_without_doors
+
+def is_point_in_bbox(point, bbox):
+    """
+    Check if a point is within a bounding box.
+
+    Args:
+        point: The XYZ point to check.
+        bbox: The BoundingBoxXYZ to test against.
+
+    Returns:
+        True if the point is inside the bounding box; otherwise, False.
+    """
+    if bbox is None:
+        # print("Error: Bounding box is None.")
+        return False
+
+    min_point = bbox.Min
+    max_point = bbox.Max
+
+    return (min_point.X <= point.X <= max_point.X and
+            min_point.Y <= point.Y <= max_point.Y and
+            min_point.Z <= point.Z <= max_point.Z)
+
+# #####
+
+def get_elements_inside_room(doc, room):
+    """
+    Retrieve furniture elements inside a given room based on bounding box intersection.
+
+    Args:
+        doc: The Revit document.
+        room: The room element to check.
+
+    Returns:
+        List of element names inside the room.
+    """
+    try:
+        # Get the bounding box of the room
+        room_bbox = room.get_BoundingBox(None)
+
+        # Collect all furniture elements in the document
+        furniture_category_filter = ElementCategoryFilter(BuiltInCategory.OST_Furniture)
+        elements = FilteredElementCollector(doc).WherePasses(furniture_category_filter).WhereElementIsNotElementType().ToElements()
+        elements_inside_room = []
+
+        for element in elements:
+            # Get the element's bounding box
+            element_bbox = element.get_BoundingBox(None)
+            if element_bbox is None:
+                continue
+
+            # Check if the element's bounding box intersects with the room's bounding box
+            if is_point_in_bbox(element_bbox.Min, room_bbox) or is_point_in_bbox(element_bbox.Max, room_bbox):
+                elements_inside_room.append(element)
+
+        return elements_inside_room
+
+    except Exception as e:
+        print("Error retrieving elements inside room: {}".format(e))
+        return []
+
+def get_element_name(element):
+    """
+    Safely retrieve the name of an element (Family Name or Type Name). 
+    If not available, return a fallback name.
+    
+    Args:
+        element: The Revit element to get the name from.
+
+    Returns:
+        The Family Name or Type Name of the element or a fallback name if not available.
+    """
+    try:
+        # If element has a Family property, use the Family Name (this is typical for furniture)
+        if hasattr(element, 'Family') and element.Family is not None:
+            return element.Family.Name
+        # Otherwise, use the Type Name (this will work for many other element types)
+        elif hasattr(element, 'Name') and element.Name is not None:
+            return element.Name
+        # If element has a Type property, we may use its Name
+        elif hasattr(element, 'GetType') and element.GetType() is not None:
+            type_name = element.GetType().Name
+            return type_name
+        else:
+            return "Unnamed Element"
+    except Exception as e:
+        print("Error retrieving element name: {}".format(e))
+        return "Unnamed Element"
+
+def export_elements_inside_rooms(doc):
+    """
+    Export all furniture elements inside rooms to a CSV file.
+
+    Args:
+        doc: The Revit document.
+        uidoc: The Revit UI document.
+    """
+    try:
+        
+        # Determine the Revit file's directory
+        revit_file_path = doc.PathName
+        if not revit_file_path:
+            raise Exception("The document must be saved before exporting room contents.")
+        
+        revit_directory = os.path.dirname(revit_file_path)
+        # excel_file_path = os.path.join(revit_directory, "RoomContents.xlsx")
+
+        # Set the file path for the CSV
+        file_path = os.path.join(revit_directory, "furniture_elements_inside_rooms.csv")
+
+        # Open the file and write headers if the file doesn't exist
+        with open(file_path, mode='w') as file:  # Removed 'newline' argument here
+            writer = csv.writer(file)
+            writer.writerow(['Room Name', 'Element Name', 'Element ID'])
+
+            # Retrieve all rooms (SpatialElement is the correct class for rooms)
+            rooms = FilteredElementCollector(doc).OfClass(SpatialElement).ToElements()
+
+            # For each room, get the elements inside it
+            for room in rooms:
+                # room_name = room.Name
+                
+                # Get the room name via get_Parameter
+                room_name_param = room.get_Parameter(BuiltInParameter.ROOM_NAME)
+                if room_name_param and room_name_param.HasValue:
+                    room_name = room_name_param.AsString()
+                else:
+                    room_name = "Unnamed Room"  # Default if no name is found
 
 
+                elements_inside_room = get_elements_inside_room(doc, room)
+
+                # Write the room and elements' details to the CSV
+                for element in elements_inside_room:
+                    element_name = get_element_name(element)
+                    writer.writerow([room_name, element_name, element.Id.IntegerValue])
+
+        # TaskDialog.Show("Export Complete", "Furniture elements inside rooms have been exported to {}".format(file_path))
+
+    except Exception as e:
+        print("Error exporting elements inside rooms: {}".format(e))
+        # TaskDialog.Show("Error", "An error occurred while exporting: {}".format(e))
+
+def get_element_bounding_box(element):
+    """
+    Get the bounding box of the element.
+
+    Args:
+        element: The Revit element to retrieve the bounding box for.
+
+    Returns:
+        BoundingBoxXYZ object or None if bounding box is not available.
+    """
+    try:
+        # Get the bounding box of the element
+        bbox = element.get_BoundingBox(None)
+        
+        if bbox is None:
+            print("Warning: Element does not have a valid bounding box.")
+            return None
+        
+        return bbox
+    except Exception as e:
+        print("Error retrieving bounding box for element: {}".format(e))
+        return None
+      
+
+#endregion
 
 # Main Logic
 args = getattr(sys, "argv", [])
