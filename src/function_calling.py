@@ -45,7 +45,7 @@ class RevitRequest(BaseModel):
     prompt: str
 
 # Function to call OpenAI API
-def call_openai(prompt, function_definitions):
+def call_openai_(prompt, function_definitions):
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -89,40 +89,36 @@ def call_openai(prompt, function_definitions):
         raise HTTPException(status_code=500, detail=f"OpenAI API error: {e}")
 
 
-def call_openai_(prompt, function_definitions):
-    system_message = {
-    "role": "system",
-    "content": (
-        "You are a Revit assistant with access to the following tools: "
-        f"{[func['name'] for func in function_definitions]}.\n"
-        "Use the following format to solve the user's query:\n\n"
-        "Question: The input question you must answer.\n"
-        "Thought: Think about what to do.\n"
-        "Action: The action to take, should be one of the tools.\n"
-        "Action Input: The input to the action.\n"
-        "Observation: The result of the action.\n"
-        "...\n"
-        "Thought: I now know the final answer.\n"
-        "Final Answer: The final answer to the original input question.\n\n"
-        "Begin!\n\n"
-        f"Question: {prompt}"
-    ),
-}
+def call_openai(prompt, function_definitions):
     try:
-        
-        # Call OpenAI API
+
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                system_message,
-                {"role": "user", "content": prompt},
-            ],
-            functions=function_definitions,
-            function_call="auto",
-        )
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", 
+                     "content": "You are a Revit assistant with access to the following tools: "
+                        f"{[func['name'] for func in function_definitions]}.\n"
+                        "Use the following format to solve the user's query:\n\n"
+                        "Question: The input question you must answer.\n"
+                        "Thought: Think about what to do.\n"
+                        "Action: The action to take, should be one of the tools just select the same name provided in the function defention .\n"
+                        "Action Input: The input to the action.\n"
+                        "Observation: The result of the action.\n"
+                        "...\n"
+                        "Thought: I now know the final answer.\n"
+                        "Final Answer: The final answer to the original input question.\n\n"
+                        "Begin!\n\n"
+                        f"Question: {prompt}"},
+                                {"role": "user", "content": prompt},
+                ],
+                functions=function_definitions,
+                function_call="auto",
+            )
+
+
         return response
     except Exception as e:
-        raise Exception(f"OpenAI API error: {e}")
+        raise HTTPException(status_code=500, detail=f"OpenAI API error: {e}")
 
 # Function to call Revit-specific operations via script
 def call_revit_script(function_name):
@@ -239,18 +235,19 @@ async def interact_with_revit(request: RevitRequest):
     # Call OpenAI API
     ai_response = call_openai(prompt, function_definitions)
 
-    # choice = ai_response["choices"][0]["message"]
-    choice = ai_response.choices[0].message
-    # Determine function call
-    if "function_call" in ai_response.choices[0].message:
-        function_name = ai_response.choices[0].message["function_call"]["name"]
-        arguments = eval(choice["function_call"]["arguments"])  # Safely parse arguments
-        # result = call_revit_script(function_name)
-        result = call_revit_script(function_name, arguments)
-    else:
-        result = f"No function selected. AI response: {ai_response}"
+    # # choice = ai_response["choices"][0]["message"]
+    # choice = ai_response.choices[0].message
+    # # Determine function call
+    # if "function_call" in ai_response.choices[0].message:
+    #     function_name = ai_response.choices[0].message["function_call"]["name"]
+    #     arguments = eval(choice["function_call"]["arguments"])  # Safely parse arguments
+    #     # result = call_revit_script(function_name)
+    #     result = call_revit_script(function_name, arguments)
+    # else:
+    #     result = f"No function selected. AI response: {ai_response}"
 
-    return {"ai_response": ai_response, "revit_result": result}
+    # return {"ai_response": ai_response, "revit_result": result}
+    return {"ai_response":ai_response}
 
 
 @app.post("/revit/")
@@ -359,15 +356,17 @@ async def interact_with_revit_(request: RevitRequest):
     # Prepare actions list
     actions = []
 
-    # Check if AI generated function calls
-    if "function_call" in choice:
-        function_calls = json.loads(choice["function_call"]["arguments"])  # Expecting a list of calls
-
-        for function_call in function_calls:
+    try:
+        # Check if AI generated function calls
+        if "function_call" in choice:
+            # Parse and process function calls
+            function_call = choice["function_call"]
             function_name = function_call["name"]
-            arguments = function_call["arguments"]
+            arguments = json.loads(function_call["arguments"])
+
             try:
-                result = call_revit_script(function_name, arguments)  # Call script for each function
+                # Call the Revit script for the function
+                result = call_revit_script(function_name, arguments)
                 actions.append({
                     "function_name": function_name,
                     "arguments": arguments,
@@ -381,8 +380,33 @@ async def interact_with_revit_(request: RevitRequest):
                     "status": "error",
                     "error": str(e)
                 })
-    else:
-        actions.append({"status": "error", "error": "No function calls detected in AI response."})
+        else:
+            # Parse actions and inputs from content if no structured function calls are present
+            content = choice["content"]
+            lines = content.split("\n")
+            for line in lines:
+                if line.startswith("Action:"):
+                    function_name = line.split(":", 1)[1].strip()
+                elif line.startswith("Action Input:"):
+                    arguments = json.loads(line.split(":", 1)[1].strip())
+                    try:
+                        # Call the Revit script for the parsed function
+                        result = call_revit_script(function_name, arguments)
+                        actions.append({
+                            "function_name": function_name,
+                            "arguments": arguments,
+                            "status": "success",
+                            "result": result
+                        })
+                    except Exception as e:
+                        actions.append({
+                            "function_name": function_name,
+                            "arguments": arguments,
+                            "status": "error",
+                            "error": str(e)
+                        })
+    except Exception as e:
+        actions.append({"status": "error", "error": f"Failed to process AI response: {str(e)}"})
 
     return {"ai_response": {"actions": actions}}
 

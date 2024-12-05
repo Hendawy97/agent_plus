@@ -13,6 +13,8 @@ clr.AddReference("System.Drawing")
 import inspect
 import csv
 import os
+import re
+
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -53,7 +55,8 @@ class ModalForm(WPFWindow):
         # Process the input from the TextBox
         self.process_input(sender, e)
 
-def call_server_api(prompt):
+#get the function calling result from the response 
+def call_server_api_(prompt):
     """
     Sends a prompt to the server API, parses the response, and executes the corresponding function.
 
@@ -99,8 +102,8 @@ def call_server_api(prompt):
         # Handle connection errors
         print("Error connecting to server: {0}".format(e))
 
-
-def call_server_api_(prompt):
+#get the actions and innputs not function calling of api but custom prompt React
+def call_server_api(prompt):
     """
     Sends a prompt to the server API, parses the response, and executes the corresponding function(s).
 
@@ -111,80 +114,81 @@ def call_server_api_(prompt):
     data = {'prompt': prompt}
     
     try:
-        # Send POST request to the server
-        response = requests.post(endpoint, json=data)
-        
+        response = requests.post(endpoint, json=data)  # Example API call
         if response.status_code == 200:
-            print("Server processed the input successfully.")
-            
-            # Parse the JSON response
             response_json = response.json()
             print("Server Response: ", response_json)
-            
-            # Extract the 'choices' from the response and look for 'function_call' or other relevant actions
-            choices = response_json.get('ai_response', {}).get('choices', [])
-            
-            if choices:
-                # Parse the response content to extract action and input
-                message_content = choices[0].get('message', {}).get('content', "")
-                print("Message Content: ", message_content)
-                
-                # Extract actions from the message content
-                actions = extract_actions_from_message(message_content)
-                
-                if actions:
-                    # Execute all actions sequentially
-                    for action in actions:
-                        function_name = action.get("function_name")
-                        arguments = action.get("arguments", {})
-                        
-                        if function_name:
-                            print("Executing function: {0} with arguments: {1}".format(function_name, arguments))
-                            try:
-                                execute_function(function_name, **arguments)
-                            except Exception as e:
-                                print("Error executing function {0}: {1}".format(function_name, e))
-                        else:
-                            print("No function name found in the action.")
-                else:
-                    print("No actions found in the message content.")
+
+            # Extract actions from the response
+            actions = extract_actions_from_content(response_json)
+            print("actions is ", actions)
+
+            if actions:
+                for action in actions:
+                    function_name = action.get("action")
+                    arguments = action.get("action_input", {})
+                    status = action.get("status", "success")  # Assuming status is part of the response
+
+                    if status == "success":
+                        print("Executing function '{0}' with arguments: {1}".format(function_name, arguments))
+                        try:
+                            execute_function(function_name, **arguments)
+                        except Exception as e:
+                            print("Error executing function {0}: {1}".format(function_name, str(e)))
+                    elif status == "error":
+                        error_message = action.get("error", "Unknown error")
+                        print("Error in server-side function '{0}': {1}".format(function_name, error_message))
             else:
-                print("No 'choices' detected in AI response.")
+                print("No actions returned by the server.")
         else:
             # Handle HTTP error responses
             print("Error from server: {0} - {1}".format(response.status_code, response.text))
     except requests.exceptions.RequestException as e:
         # Handle connection errors
-        print("Error connecting to server: {0}".format(e))
+        print("Error connecting to server: {0}".format(str(e)))
 
-
-def extract_actions_from_message(content):
+#get all the actions and actions inputs from the server response
+def extract_actions_from_content(server_response):
     """
-    Extracts actions from the AI response content based on specific patterns or structure.
-    
+    Extracts actions and their inputs from the ai_response content in the server response.
+
     Args:
-        content (str): The content of the AI response message.
-        
+        server_response (dict): The JSON response from the server.
+
     Returns:
-        list: A list of actions (each represented as a dictionary).
+        list: A list of dictionaries containing action details (action and input).
     """
-    actions = []
-    
-    # Check for action keywords and extract data
-    if "Action" in content:
-        # Example pattern to extract actions (this needs to be adjusted based on exact response format)
-        action_lines = content.split('\n')
-        for line in action_lines:
-            if "Action:" in line:
-                action_name = line.split(":")[1].strip()
-                action_input = next((l for l in action_lines if "Action Input:" in l), "").split(":")[1].strip()
-                actions.append({"function_name": action_name, "arguments": json.loads(action_input)})
-    
-    return actions
+    # Navigate to the 'content' field in the response
+    try:
+        content = (
+            server_response.get('ai_response', {})
+            .get('choices', [])[0]
+            .get('message', {})
+            .get('content', "")
+        )
+    except (IndexError, AttributeError):
+        return []
 
+    # Regex pattern to extract actions and their inputs
+    action_pattern = r"Action: (.*?)\nAction Input: (.*?)\n"
 
+    # Find all matches
+    matches = re.findall(action_pattern, content, re.DOTALL)
 
-def execute_function(function_name, *args, **kwargs):
+    # Parse and store results
+    extracted_actions = []
+    for action, action_input in matches:
+        try:
+            # Try to parse the action input as JSON
+            action_input = json.loads(action_input.strip())
+        except json.JSONDecodeError:
+            action_input = action_input.strip()  # Keep as string if JSON parsing fails
+
+        extracted_actions.append({"action": action.strip(), "action_input": action_input})
+
+    return extracted_actions
+
+def execute_function_(function_name, *args, **kwargs):
     """
     Executes the specified function with dynamic arguments.
 
@@ -230,7 +234,7 @@ def execute_function(function_name, *args, **kwargs):
     else:
         print("Invalid function name: {0}".format(function_name))
 
-def execute_function_(function_name, *args, **kwargs):
+def execute_function(function_name, *args, **kwargs):
     """
     Executes the specified function with dynamic arguments.
 
@@ -269,78 +273,6 @@ def execute_function_(function_name, *args, **kwargs):
             print("Error executing {0}: {1}".format(function_name, e))
     else:
         print("Invalid function name: {0}".format(function_name))
-
-
-# Function to extract the function name from the server response
-def extract_function_name(response_json):
-    # Assuming response structure has a field 'function_call' with the 'name'
-    # function_name = response_json.get('ai_response', {}).get('choices', [{}])[0].get('message', {}).get('function_call', {}).get('name')
-    # print("Extracted function name: {0}".format(function_name))
-    # return function_name
-    try:
-        function_name = response_json.get('ai_response', {}).get('choices', [{}])[0].get('message', {}).get('function_call', {}).get('name', None)
-        
-        if function_name is None:
-            print("Function name is None or not found in the response.")
-        else:
-            print("Extracted function name: {0}".format(function_name))
-        
-        return function_name
-    except Exception as e:
-        print("Error extracting function name: {0}".format(e))
-        return None
-
-
-#region
-
-# def execute_function_sequence(function_sequence):
-#     """
-#     Executes a sequence of functions in order.
-
-#     Args:
-#         function_sequence (list): A list of function dictionaries with 'name' and 'args'.
-#     """
-#     for function_data in function_sequence:
-#         function_name = function_data.get('name')
-#         arguments = function_data.get('args', {})
-#         if function_name:
-#             print("Executing {0} with arguments: {1}".format(function_name, arguments))
-#             execute_function(function_name, **arguments)
-#         else:
-#             print("Invalid function data:", function_data)
-
-# def call_server_api(prompt):
-#     """
-#     Sends a prompt to the server API, parses the response, and executes functions in sequence.
-
-#     Args:
-#         prompt (str): The user input to be sent to the server.
-#     """
-#     endpoint = "http://localhost:5000/revit/"  # Update with the actual server URL
-#     data = {'prompt': prompt}
-
-#     try:
-#         response = requests.post(endpoint, json=data)
-
-#         if response.status_code == 200:
-#             print("Server processed the input successfully.")
-#             response_json = response.json()
-
-#             # Parse the function sequence
-#             function_sequence = response_json.get('function_sequence', [])
-#             if function_sequence:
-#                 execute_function_sequence(function_sequence)
-#             else:
-#                 print("No valid function sequence found in the server response.")
-#         else:
-#             print("Server error {0}: {1}".format(response.status_code, response.text))
-#     except requests.exceptions.RequestException as e:
-#         print("Error connecting to server: {0}".format(e))
-
-
-
-#endregion
-
 
 #region tools
 
